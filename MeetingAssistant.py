@@ -10,6 +10,7 @@ import numpy as np
 import pygame
 import pyttsx3
 import requests
+from colorama import Fore, Style, init
 from cozepy import COZE_CN_BASE_URL, Coze, TokenAuth
 
 try:
@@ -69,6 +70,7 @@ class MeetingAssistant:
     def __init__(self):
         self.coze = CozeClient()
         self._init_audio_system()
+        init(autoreset=True)  # 自动重置颜色
 
     def _init_audio_system(self):
         pygame.mixer.init()
@@ -254,7 +256,7 @@ def audio_capture_loop(args, assistant):
                 # 获取最终识别结果
                 final_text = speech_recognizer.get_result(asr_stream)
                 content = f"\n{speaker}: {final_text}"
-                print(content)
+                print(Fore.BLUE + Style.BRIGHT + content)
                 speech_recognizer.reset(asr_stream)
                 partial_result = None
 
@@ -268,7 +270,7 @@ def audio_capture_loop(args, assistant):
 
             # 显示实时结果
             if partial_result:
-                sys.stdout.write(f"\r实时转录: {partial_result}")
+                sys.stdout.write(Fore.GREEN + Style.BRIGHT + f"\r实时转录: {partial_result}")
                 sys.stdout.flush()
 
 
