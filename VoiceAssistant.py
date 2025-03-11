@@ -17,6 +17,8 @@ from cozepy import Coze, TokenAuth, Message, ChatStatus, MessageContentType  # n
 
 from VoiceprintRecognizer import VoiceprintRecognizer
 
+from gtts import gTTS
+
 # 配置参数
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
@@ -37,8 +39,9 @@ coze = Coze(auth=TokenAuth(token=coze_api_token), base_url=coze_api_base)
 
 # Create a workflow instance in Coze, copy the last number from the web link as the workflow's ID.
 # 会议记录工作流
-workflow_id_meeting_record = '7478309129674260514'
+workflow_id_meeting_record = '7478326457301008394'
 workflow_id_meeting_guest = '7480057361940725795'
+workflow_id_meeting_summary = '7478981906383781942'
 
 # 初始化pygame
 pygame.mixer.init()
@@ -191,8 +194,38 @@ def save_meeting_record(content, result_by_ai):
     # 发送给coze工作流，做会议记录
     coze.workflows.runs.create(
         workflow_id=workflow_id_meeting_record,
-        parameters={"USER_INPUT": content}
+        parameters={"input": content}
     )
+
+def meeting_summary(content, result_by_ai):
+    # 发送给coze工作流，做会议记录
+    workflow = coze.workflows.runs.create(
+        workflow_id=workflow_id_meeting_summary,
+        parameters={"input": content}
+    )
+    parsed_data = json.loads(workflow.data)
+    result_by_ai['output'] = f'小U: {parsed_data["output"]}'
+    result_by_ai['query'] = parsed_data['query']
+    result_by_ai['url'] = parsed_data["url"]
+
+    print(parsed_data)
+    if result_by_ai['query'] == 1:
+        print("meeting_summary:")
+        print(result_by_ai['output'])
+        print("=" * 50)
+        tts = gTTS(text=result_by_ai['output'], lang='zh-cn')
+        # 将文本转为语音并保存为音频文件
+        tts.save("recordings/summary.mp3")
+        # 加载MP3文件
+        pygame.mixer.music.load("recordings/summary.mp3")
+
+        # 播放MP3文件
+        pygame.mixer.music.play()
+
+        # 等待音乐播放完毕
+        while pygame.mixer.music.get_busy():
+            pygame.time.Clock().tick(10)
+
 
 def get_ai_response(content, result_by_ai):
     # 发送给coze工作流，嘉宾发言
@@ -205,22 +238,24 @@ def get_ai_response(content, result_by_ai):
     result_by_ai['output'] = f'小U: {parsed_data["output"]}'
     result_by_ai['url'] = parsed_data["url"]
 
-    print(result_by_ai['output'])
-    print("=" * 50)
-    #  播放小U发言
-    response = requests.get(result_by_ai["url"])
-    with open("recordings/ai.mp3", 'wb') as file:
-        file.write(response.content)
+    if '小U收到' not in parsed_data["output"]:
+        print("get_ai_response:")
+        print(result_by_ai['output'])
+        print("=" * 50)
+        #  播放小U发言
+        response = requests.get(result_by_ai["url"])
+        with open("recordings/ai.mp3", 'wb') as file:
+            file.write(response.content)
 
-    # 加载MP3文件
-    pygame.mixer.music.load("recordings/ai.mp3")
+        # 加载MP3文件
+        pygame.mixer.music.load("recordings/ai.mp3")
 
-    # 播放MP3文件
-    pygame.mixer.music.play()
+        # 播放MP3文件
+        pygame.mixer.music.play()
 
-    # 等待音乐播放完毕
-    while pygame.mixer.music.get_busy():
-        pygame.time.Clock().tick(10)
+        # 等待音乐播放完毕
+        while pygame.mixer.music.get_busy():
+            pygame.time.Clock().tick(10)
 
 if __name__ == "__main__":
     vr = VoiceprintRecognizer()
@@ -235,7 +270,7 @@ if __name__ == "__main__":
 
                 # 创建字典存储结果
                 result = {'speaker': None, 'score': None, 'text': None}
-                result_by_ai = {'output': None, 'url': None}
+                result_by_ai = {'output': None, 'url': None, 'query': None}
 
                 # 创建线程
                 threads = [
@@ -250,6 +285,12 @@ if __name__ == "__main__":
                 for thread in threads:
                     thread.join()
 
+                end_time = time.time()
+
+                # 计算耗时
+                execution_time = end_time - start_time
+                print(f"识别嘉宾和语音转文字耗时：{execution_time:.6f} 秒")
+
                 # 打印结果
                 speaker = result['speaker']
                 score = result['score']
@@ -262,21 +303,39 @@ if __name__ == "__main__":
                         print(f'{speaker}({score}): {text}')
                         print("=" * 50)
 
+                    start_time_tmp = time.time()
                     # 发送给coze工作流，做会议记录
                     #save_meeting_record(f'{speaker}({score}): {text}')
                     content = f'{speaker}({score}): {text}'
                     threading.Thread(target=save_meeting_record, args=(content, result_by_ai)).start()
 
+                    # 会议总结
+                    thread_summary = threading.Thread(target=meeting_summary, args=(content, result_by_ai))
+                    thread_summary.start()
+                    thread_summary.join()
+
+                    end_time = time.time()
+
+                    # 计算耗时
+                    execution_time = end_time - start_time_tmp
+                    print(f"小U总结耗时：{execution_time:.6f} 秒")
+
                     # 发送给coze工作流，嘉宾发言
-                    thread = threading.Thread(target=get_ai_response, args=(content,result_by_ai))
-                    thread.start()
-                    thread.join()
+                    thread_response = threading.Thread(target=get_ai_response, args=(content,result_by_ai))
+                    thread_response.start()
+                    thread_response.join()
+
+                    end_time = time.time()
+
+                    # 计算耗时
+                    execution_time = end_time - start_time_tmp
+                    print(f"嘉宾发言耗时：{execution_time:.6f} 秒")
 
                 end_time = time.time()
 
                 # 计算耗时
                 execution_time = end_time - start_time
-                print(f"识别耗时：{execution_time:.6f} 秒")
+                print(f"单次全流程耗时：{execution_time:.6f} 秒")
 
         except Exception as e:
             print(f"发生未预期错误: {str(e)}")

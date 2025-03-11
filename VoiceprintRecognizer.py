@@ -92,7 +92,7 @@ class VoiceprintRecognizer:
 
         # 阈值判断
         if best_match[1] < self.threshold:
-            return ("unknown", best_match[1])
+            return "unknown", best_match[1]
         return best_match
 
     def enroll_speaker(self, wav_path, speaker_id):
