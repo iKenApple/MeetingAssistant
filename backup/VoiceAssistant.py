@@ -29,7 +29,7 @@ class Config:
     MAX_DURATION = 300
 
     # 路径配置
-    RECORDINGS_DIR = "recordings"
+    RECORDINGS_DIR = "../recordings"
     SUMMARY_FILE = "summary.mp3"
     AI_RESPONSE_FILE = "ai.mp3"
 

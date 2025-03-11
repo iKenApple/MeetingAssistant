@@ -12,15 +12,15 @@ class VoiceprintRecognizer:
         模型路径需要根据实际情况修改
         """
         # 初始化语音识别模型（必需，即使不使用文本）
-        self.asr_model = Model("models/vosk-model-cn-0.22")
+        self.asr_model = Model("../models/vosk-model-cn-0.22")
 
         # 加载声纹识别模型
-        self.spk_model = SpkModel("models/vosk-model-spk-0.4")
+        self.spk_model = SpkModel("../models/vosk-model-spk-0.4")
 
         # 注册说话人数据库
         self.speaker_db = {
-            "王斯丙": np.load("voice/speaker_sbwang.npy"),
-            "吴凡": np.load("voice/fanwu.npy")
+            "王斯丙": np.load("../voice/speaker_sbwang.npy"),
+            "吴凡": np.load("../voice/fanwu.npy")
         }
 
         # 相似度阈值（根据实际场景调整）
