@@ -6,12 +6,15 @@ import os
 import sys
 import threading
 from collections import defaultdict
+from datetime import datetime
+
 import numpy as np
 import pygame
 import pyttsx3
 import requests
 from colorama import Fore, Style, init
 from cozepy import COZE_CN_BASE_URL, Coze, TokenAuth
+from concurrent.futures import ThreadPoolExecutor
 
 try:
     import sounddevice as sd
@@ -79,24 +82,39 @@ class MeetingAssistant:
     def _process_ai_response(self, content):
         result = {'output': None, 'url': None, 'query': None}
 
-        print("会议总结工作流处理中...")
+        #print("会议总结工作流处理中...")
         # 会议总结处理
-        summary_data = self.coze.run_workflow('summary', content)
-        if summary_data.get("query") == 1:
-            self._handle_summary(summary_data, result)
-        print("会议总结工作流处理结束")
+        #summary_data = self.coze.run_workflow('summary', content)
+        #if summary_data.get("query") == 1:
+        #    self._handle_summary(summary_data, result)
+        #print("会议总结工作流处理结束")
 
-        print("会议嘉宾工作流处理中...")
-        # AI响应处理
-        guest_data = self.coze.run_workflow('guest', content)
-        self._handle_guest_response(guest_data, result)
-        print("会议嘉宾工作流处理结束")
+        #print("会议嘉宾工作流处理中...")
+        # 会议嘉宾处理
+        #guest_data = self.coze.run_workflow('guest', content)
+        #self._handle_guest_response(guest_data, result)
+        #print("会议嘉宾工作流处理结束")
+
+        with ThreadPoolExecutor() as executor:
+            summary_future = executor.submit(self.coze.run_workflow, 'summary', content)
+            guest_future = executor.submit(self.coze.run_workflow, 'guest', content)
+
+            # 会议总结处理
+            summary_data = summary_future.result()
+            self._handle_summary(summary_data, result)
+
+            # 会议嘉宾处理
+            guest_data = guest_future.result()
+            self._handle_guest_response(guest_data, result)
 
     def _handle_summary(self, data, result):
-        result['output'] = f'小U: {data["output"]}'
-        print(f"{result['output']}\n")
-        self.pp.say(result['output'])
-        self.pp.runAndWait()
+        if data.get("query") == 1:
+            print("会议总结工作流处理中...")
+            result['output'] = f'小U: {data["output"]}'
+            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            print(f"{current_time} {result['output']}\n")
+            self.pp.say(result['output'])
+            self.pp.runAndWait()
         #tts = gTTS(text=result['output'], lang='zh-cn')
         #tts.save(os.path.join(Config.RECORDINGS_DIR, Config.SUMMARY_FILE))
         #AudioPlayer.play(os.path.join(Config.RECORDINGS_DIR, Config.SUMMARY_FILE))
@@ -107,7 +125,9 @@ class MeetingAssistant:
             'url': data["url"]
         })
         if '小U收到' not in data["output"]:
-            print(f"{result['output']}\n")
+            print("会议嘉宾工作流处理中...")
+            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            print(f"{current_time} {result['output']}\n")
             response = requests.get(result["url"])
             with open(os.path.join(Config.RECORDINGS_DIR, Config.AI_RESPONSE_FILE), 'wb') as f:
                 f.write(response.content)
@@ -173,7 +193,7 @@ def init_speaker_system(args):
     vad_config.silero_vad.min_silence_duration = 0.5
     vad_config.silero_vad.min_speech_duration = 0.5
     vad_config.sample_rate = SAMPLE_RATE
-    vad = sherpa_onnx.VoiceActivityDetector(vad_config, buffer_size_in_seconds=100)
+    vad = sherpa_onnx.VoiceActivityDetector(vad_config, buffer_size_in_seconds=300)
 
     return extractor, vad
 
@@ -255,7 +275,8 @@ def audio_capture_loop(args, assistant):
 
                 # 获取最终识别结果
                 final_text = speech_recognizer.get_result(asr_stream)
-                content = f"\n{speaker}: {final_text}"
+                current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                content = f"\n{current_time} {speaker}: {final_text}"
                 print(Fore.BLUE + Style.BRIGHT + content)
                 speech_recognizer.reset(asr_stream)
                 partial_result = None
@@ -267,6 +288,7 @@ def audio_capture_loop(args, assistant):
                 ).start()
 
                 assistant._process_ai_response(content)
+                print("单次全流程处理结束")
 
             # 显示实时结果
             if partial_result:
