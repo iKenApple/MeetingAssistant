@@ -179,11 +179,11 @@ with gr.Blocks(css=css, title="多人会议系统") as demo:
             time.sleep(0.3)
             yield generate_html()
 
+    chat_display = gr.HTML(every=0.3)  # 直接为组件设置更新间隔
 
     demo.load(
         update_chat,
-        outputs=chat_display,
-        every=0.3
+        outputs=chat_display
     )
 
 # ====== 启动系统 ======
