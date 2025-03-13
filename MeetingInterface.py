@@ -6,12 +6,58 @@ import os
 import sys
 import threading
 from collections import defaultdict
+from datetime import datetime
+
 import numpy as np
 import pygame
 import pyttsx3
 import requests
 from colorama import Fore, Style, init
 from cozepy import COZE_CN_BASE_URL, Coze, TokenAuth
+from concurrent.futures import ThreadPoolExecutor
+
+import gradio as gr
+import threading
+import time
+import random
+from dataclasses import dataclass
+
+# ====== 数据结构 ======
+@dataclass
+class Message:
+    speaker: str
+    text: str
+    timestamp: float = time.time()
+
+# ====== 全局配置 ======
+SPEAKERS = {
+    "王斯丙": {
+        "avatar": "https://img2.baidu.com/it/u=1424382294,643570206&fm=253&fmt=auto&app=138&f=JPEG?w=500&h=506",
+        # 金色麦标头像
+        "color": "#ffd700",
+        "position": "left"
+    },
+    "吴凡": {
+        "avatar": "https://img0.baidu.com/it/u=552024851,2385678488&fm=253&fmt=auto&app=138&f=PNG?w=500&h=500",  # 眼镜图标
+        "color": "#40e0d0",
+        "position": "left"
+    },
+    "听众": {
+        "avatar": "https://img2.baidu.com/it/u=1360716152,3525735271&fm=253&fmt=auto&app=138&f=JPEG?w=360&h=360",
+        # 图表图标
+        "color": "#9370db",
+        "position": "right"
+    },
+    "客户代表": {
+        "avatar": "https://img0.baidu.com/it/u=2699727399,3838550670&fm=253&fmt=auto&app=138&f=JPEG?w=360&h=360",
+        # 用户图标
+        "color": "#ff6347",
+        "position": "right"
+    }
+}
+
+chat_history = []
+lock = threading.Lock()
 
 try:
     import sounddevice as sd
@@ -32,7 +78,7 @@ class Config:
     AI_RESPONSE_FILE = "ai.mp3"
 
     # Coze配置
-    API_TOKEN = 'pat_KOHb9a6TPJWs504SZYdrKdJNiG2a1JLZro9rtSkQHnzHkDl7ViPEBPa64Tiiovjg'
+    API_TOKEN = 'pat_8zXTiDzY2czhcT19CJmyqd5FzQLeSTVQHNdX7qX6AxwQpAVxtTOzdDE8GdzEiOQe'
     BASE_URL = COZE_CN_BASE_URL
     WORKFLOW_IDS = {
         'record': '7478326457301008394',
@@ -79,24 +125,40 @@ class MeetingAssistant:
     def _process_ai_response(self, content):
         result = {'output': None, 'url': None, 'query': None}
 
-        print("会议总结工作流处理中...")
+        #print("会议总结工作流处理中...")
         # 会议总结处理
-        summary_data = self.coze.run_workflow('summary', content)
-        if summary_data.get("query") == 1:
-            self._handle_summary(summary_data, result)
-        print("会议总结工作流处理结束")
+        #summary_data = self.coze.run_workflow('summary', content)
+        #if summary_data.get("query") == 1:
+        #    self._handle_summary(summary_data, result)
+        #print("会议总结工作流处理结束")
 
-        print("会议嘉宾工作流处理中...")
-        # AI响应处理
-        guest_data = self.coze.run_workflow('guest', content)
-        self._handle_guest_response(guest_data, result)
-        print("会议嘉宾工作流处理结束")
+        #print("会议嘉宾工作流处理中...")
+        # 会议嘉宾处理
+        #guest_data = self.coze.run_workflow('guest', content)
+        #self._handle_guest_response(guest_data, result)
+        #print("会议嘉宾工作流处理结束")
+
+        with ThreadPoolExecutor() as executor:
+            summary_future = executor.submit(self.coze.run_workflow, 'summary', content)
+            guest_future = executor.submit(self.coze.run_workflow, 'guest', content)
+
+            # 会议总结处理
+            summary_data = summary_future.result()
+            self._handle_summary(summary_data, result)
+
+            if summary_data.get("query") != 1:
+                # 会议嘉宾处理
+                guest_data = guest_future.result()
+                self._handle_guest_response(guest_data, result)
 
     def _handle_summary(self, data, result):
-        result['output'] = f'小U: {data["output"]}'
-        print(f"{result['output']}\n")
-        self.pp.say(result['output'])
-        self.pp.runAndWait()
+        if data.get("query") == 1:
+            print("会议总结工作流处理中...")
+            result['output'] = f'小U: {data["output"]}'
+            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            print(f"{current_time} {result['output']}\n")
+            self.pp.say(result['output'])
+            self.pp.runAndWait()
         #tts = gTTS(text=result['output'], lang='zh-cn')
         #tts.save(os.path.join(Config.RECORDINGS_DIR, Config.SUMMARY_FILE))
         #AudioPlayer.play(os.path.join(Config.RECORDINGS_DIR, Config.SUMMARY_FILE))
@@ -107,7 +169,9 @@ class MeetingAssistant:
             'url': data["url"]
         })
         if '小U收到' not in data["output"]:
-            print(f"{result['output']}\n")
+            print("会议嘉宾工作流处理中...")
+            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            print(f"{current_time} {result['output']}\n")
             response = requests.get(result["url"])
             with open(os.path.join(Config.RECORDINGS_DIR, Config.AI_RESPONSE_FILE), 'wb') as f:
                 f.write(response.content)
@@ -173,7 +237,7 @@ def init_speaker_system(args):
     vad_config.silero_vad.min_silence_duration = 0.5
     vad_config.silero_vad.min_speech_duration = 0.5
     vad_config.sample_rate = SAMPLE_RATE
-    vad = sherpa_onnx.VoiceActivityDetector(vad_config, buffer_size_in_seconds=100)
+    vad = sherpa_onnx.VoiceActivityDetector(vad_config, buffer_size_in_seconds=300)
 
     return extractor, vad
 
@@ -255,8 +319,14 @@ def audio_capture_loop(args, assistant):
 
                 # 获取最终识别结果
                 final_text = speech_recognizer.get_result(asr_stream)
-                content = f"\n{speaker}: {final_text}"
+                current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                content = f"\n{current_time} {speaker}: {final_text}"
                 print(Fore.BLUE + Style.BRIGHT + content)
+                # 输出到界面
+                with lock:
+                    chat_history.append(
+                        Message(speaker=speaker, text=final_text, timestamp=time.time())
+                    )
                 speech_recognizer.reset(asr_stream)
                 partial_result = None
 
@@ -267,16 +337,149 @@ def audio_capture_loop(args, assistant):
                 ).start()
 
                 assistant._process_ai_response(content)
+                print("单次全流程处理结束")
 
             # 显示实时结果
             if partial_result:
                 sys.stdout.write(Fore.GREEN + Style.BRIGHT + f"\r实时转录: {partial_result}")
                 sys.stdout.flush()
 
+# ====== 生成聊天消息HTML ======
+def generate_html():
+    html = '<div class="chat-container">'
+    with lock:
+        for msg in chat_history:
+            config = SPEAKERS[msg.speaker]
+            align_class = "left-align" if config["position"] == "left" else "right-align"
 
+            html += f'''
+            <div class="message-row {align_class}">
+                <img src="{config['avatar']}" class="avatar" 
+                     style="border: 2px solid {config['color']}">
+                <div class="message-content">
+                    <div class="speaker-name" style="color: {config['color']}">
+                        {msg.speaker}
+                    </div>
+                    <div class="message-bubble" style="background: {config['color']}10; 
+         border-left: 3px solid {config['color']};
+         color: #333">
+        {msg.text}
+        <div class="timestamp">{time.strftime("%H:%M:%S", time.localtime(msg.timestamp))}</div>
+    </div>
+                </div>
+            </div>
+            '''
+    # Add scroll trigger element
+    html += '''
+    <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" 
+         onload="this.parentNode.scrollTop = this.parentNode.scrollHeight" 
+         style="display: none;">
+    '''
+    return html + '</div>'
+
+
+# ====== 界面构建 ======
+css = """
+.chat-container {
+    height: 70vh;
+    overflow-y: auto;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 10px;
+}
+
+.message-row {
+    display: flex;
+    margin: 15px 0;
+    gap: 15px;
+}
+
+.left-align {
+    flex-direction: row;
+}
+
+.right-align {
+    flex-direction: row-reverse;
+}
+
+.avatar {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.message-content {
+    max-width: 70%;
+}
+
+.speaker-name {
+    font-weight: 600;
+    margin-bottom: 5px;
+    font-size: 0.9em;
+}
+
+.message-bubble {
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: white;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.timestamp {
+    font-size: 0.8em;
+    color: #666;
+    margin-top: 8px;
+    text-align: right;
+}
+"""
+
+with gr.Blocks(css=css, title="多人会议系统") as demo:
+    # 标题区
+    gr.Markdown("## 多角色会议系统 ｜ 当前参会人：")
+    with gr.Row():
+        for speaker in SPEAKERS:
+            gr.Image(SPEAKERS[speaker]["avatar"],
+                     label=speaker,
+                     width=30,
+                     show_label=True)
+
+    # 聊天区
+    chat_display = gr.HTML()
+
+
+    # 自动更新
+    def update_chat():
+        while True:
+            time.sleep(0.3)
+            yield generate_html()
+
+    chat_display = gr.HTML(every=0.3)  # 直接为组件设置更新间隔
+
+    demo.load(
+        update_chat,
+        outputs=chat_display
+    )
+
+# ====== 启动系统 ======
 if __name__ == "__main__":
     try:
         args = get_merged_args()
-        audio_capture_loop(args, MeetingAssistant())
+        threading.Thread(target=audio_capture_loop(args, MeetingAssistant()), daemon=True).start()
+
+        demo.queue().launch(
+            server_name="127.0.0.1",
+            server_port=7860,
+            share=True
+        )
     except KeyboardInterrupt:
         print("\n程序已终止")
+
+
+
+# if __name__ == "__main__":
+#     try:
+#         args = get_merged_args()
+#         audio_capture_loop(args, MeetingAssistant())
+#     except KeyboardInterrupt:
+#         print("\n程序已终止")
