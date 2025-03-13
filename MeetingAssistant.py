@@ -35,7 +35,7 @@ class Config:
     AI_RESPONSE_FILE = "ai.mp3"
 
     # Coze配置
-    API_TOKEN = 'pat_KOHb9a6TPJWs504SZYdrKdJNiG2a1JLZro9rtSkQHnzHkDl7ViPEBPa64Tiiovjg'
+    API_TOKEN = 'pat_8zXTiDzY2czhcT19CJmyqd5FzQLeSTVQHNdX7qX6AxwQpAVxtTOzdDE8GdzEiOQe'
     BASE_URL = COZE_CN_BASE_URL
     WORKFLOW_IDS = {
         'record': '7478326457301008394',
@@ -103,9 +103,10 @@ class MeetingAssistant:
             summary_data = summary_future.result()
             self._handle_summary(summary_data, result)
 
-            # 会议嘉宾处理
-            guest_data = guest_future.result()
-            self._handle_guest_response(guest_data, result)
+            if summary_data.get("query") != 1:
+                # 会议嘉宾处理
+                guest_data = guest_future.result()
+                self._handle_guest_response(guest_data, result)
 
     def _handle_summary(self, data, result):
         if data.get("query") == 1:
