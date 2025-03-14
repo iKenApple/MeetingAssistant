@@ -32,23 +32,65 @@ class Message:
 # ====== 全局配置 ======
 SPEAKERS = {
     "王斯丙": {
-        "avatar": "https://img2.baidu.com/it/u=1424382294,643570206&fm=253&fmt=auto&app=138&f=JPEG?w=500&h=506",
+        "avatar": "https://s3.bmp.ovh/imgs/2025/03/14/556ca44bc1dacfcb.png",
         # 金色麦标头像
         "color": "#ffd700",
         "position": "left"
     },
-    "吴凡": {
+    "程朝": {
+        "avatar": "https://s3.bmp.ovh/imgs/2025/03/14/556ca44bc1dacfcb.png",
+        # 金色麦标头像
+        "color": "#ffd700",
+        "position": "left"
+    },
+    "聂勋": {
         "avatar": "https://img0.baidu.com/it/u=552024851,2385678488&fm=253&fmt=auto&app=138&f=PNG?w=500&h=500",  # 眼镜图标
         "color": "#40e0d0",
         "position": "left"
     },
-    "听众": {
+    "林英觉": {
         "avatar": "https://img2.baidu.com/it/u=1360716152,3525735271&fm=253&fmt=auto&app=138&f=JPEG?w=360&h=360",
         # 图表图标
         "color": "#9370db",
         "position": "right"
     },
-    "客户代表": {
+    "吕伟": {
+        "avatar": "https://img0.baidu.com/it/u=2699727399,3838550670&fm=253&fmt=auto&app=138&f=JPEG?w=360&h=360",
+        # 用户图标
+        "color": "#ff6347",
+        "position": "right"
+    },
+    "江航": {
+        "avatar": "https://img0.baidu.com/it/u=2699727399,3838550670&fm=253&fmt=auto&app=138&f=JPEG?w=360&h=360",
+        # 用户图标
+        "color": "#ff6347",
+        "position": "right"
+    },
+    "李代立": {
+        "avatar": "https://img0.baidu.com/it/u=2699727399,3838550670&fm=253&fmt=auto&app=138&f=JPEG?w=360&h=360",
+        # 用户图标
+        "color": "#ff6347",
+        "position": "right"
+    },
+    "翟威": {
+        "avatar": "https://img0.baidu.com/it/u=2699727399,3838550670&fm=253&fmt=auto&app=138&f=JPEG?w=360&h=360",
+        # 用户图标
+        "color": "#ff6347",
+        "position": "right"
+    },
+    "刘旭": {
+        "avatar": "https://img0.baidu.com/it/u=2699727399,3838550670&fm=253&fmt=auto&app=138&f=JPEG?w=360&h=360",
+        # 用户图标
+        "color": "#ff6347",
+        "position": "right"
+    },
+    "方亚超": {
+        "avatar": "https://img0.baidu.com/it/u=2699727399,3838550670&fm=253&fmt=auto&app=138&f=JPEG?w=360&h=360",
+        # 用户图标
+        "color": "#ff6347",
+        "position": "right"
+    },
+    "小U": {
         "avatar": "https://img0.baidu.com/it/u=2699727399,3838550670&fm=253&fmt=auto&app=138&f=JPEG?w=360&h=360",
         # 用户图标
         "color": "#ff6347",
@@ -76,6 +118,8 @@ class Config:
     # 路径配置
     RECORDINGS_DIR = "./recordings"
     AI_RESPONSE_FILE = "ai.mp3"
+    SUMMARY_FILE = "summary.mp3"
+    JUDGE_FILE = "judge.mp3"
 
     # Coze配置
     API_TOKEN = 'pat_8zXTiDzY2czhcT19CJmyqd5FzQLeSTVQHNdX7qX6AxwQpAVxtTOzdDE8GdzEiOQe'
@@ -146,19 +190,44 @@ class MeetingAssistant:
             summary_data = summary_future.result()
             self._handle_summary(summary_data, result)
 
-            if summary_data.get("query") != 1:
+            if summary_data.get("query") == 0:
                 # 会议嘉宾处理
                 guest_data = guest_future.result()
                 self._handle_guest_response(guest_data, result)
 
     def _handle_summary(self, data, result):
+        result.update({
+            'output': f'小U: {data["output"]}',
+            'url': data["url"]
+        })
         if data.get("query") == 1:
             print("会议总结工作流处理中...")
             result['output'] = f'小U: {data["output"]}'
             current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             print(f"{current_time} {result['output']}\n")
-            self.pp.say(result['output'])
-            self.pp.runAndWait()
+            # 输出到界面
+            with lock:
+                chat_history.append(
+                    Message(speaker="小U", text=data["output"], timestamp=time.time())
+                )
+            response = requests.get(result["url"])
+            with open(os.path.join(Config.RECORDINGS_DIR, Config.SUMMARY_FILE), 'wb') as f:
+                f.write(response.content)
+            AudioPlayer.play(os.path.join(Config.RECORDINGS_DIR, Config.SUMMARY_FILE))
+        elif data.get("query") == 2:
+            print("会议评价工作流处理中...")
+            result['output'] = f'小U: {data["output"]}'
+            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            print(f"{current_time} {result['output']}\n")
+            # 输出到界面
+            with lock:
+                chat_history.append(
+                    Message(speaker="小U", text=data["output"], timestamp=time.time())
+                )
+            response = requests.get(result["url"])
+            with open(os.path.join(Config.RECORDINGS_DIR, Config.JUDGE_FILE), 'wb') as f:
+                f.write(response.content)
+            AudioPlayer.play(os.path.join(Config.RECORDINGS_DIR, Config.JUDGE_FILE))
         #tts = gTTS(text=result['output'], lang='zh-cn')
         #tts.save(os.path.join(Config.RECORDINGS_DIR, Config.SUMMARY_FILE))
         #AudioPlayer.play(os.path.join(Config.RECORDINGS_DIR, Config.SUMMARY_FILE))
@@ -172,6 +241,11 @@ class MeetingAssistant:
             print("会议嘉宾工作流处理中...")
             current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             print(f"{current_time} {result['output']}\n")
+            # 输出到界面
+            with lock:
+                chat_history.append(
+                    Message(speaker="小U", text=data["output"], timestamp=time.time())
+                )
             response = requests.get(result["url"])
             with open(os.path.join(Config.RECORDINGS_DIR, Config.AI_RESPONSE_FILE), 'wb') as f:
                 f.write(response.content)
@@ -234,8 +308,10 @@ def init_speaker_system(args):
     # 初始化VAD
     vad_config = sherpa_onnx.VadModelConfig()
     vad_config.silero_vad.model = args.silero_vad_model
-    vad_config.silero_vad.min_silence_duration = 0.5
-    vad_config.silero_vad.min_speech_duration = 0.5
+    vad_config.silero_vad.threshold = 0.3
+    vad_config.silero_vad.min_silence_duration = 0.3    #  决定分段的时间
+    vad_config.silero_vad.min_speech_duration = 0.75
+    vad_config.silero_vad.window_size = 512
     vad_config.sample_rate = SAMPLE_RATE
     vad = sherpa_onnx.VoiceActivityDetector(vad_config, buffer_size_in_seconds=300)
 
@@ -335,13 +411,13 @@ def audio_capture_loop(args, assistant):
                     target=assistant.coze.run_workflow,
                     args=('record', content)
                 ).start()
-
+                #
                 assistant._process_ai_response(content)
                 print("单次全流程处理结束")
 
             # 显示实时结果
             if partial_result:
-                sys.stdout.write(Fore.GREEN + Style.BRIGHT + f"\r实时转录: {partial_result}")
+                sys.stdout.write(Fore.GREEN + Style.BRIGHT + f"实时转录: {partial_result}\r")
                 sys.stdout.flush()
 
 # ====== 生成聊天消息HTML ======

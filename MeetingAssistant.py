@@ -212,7 +212,7 @@ def init_speaker_system(args):
     vad_config.silero_vad.model = args.silero_vad_model
     vad_config.silero_vad.threshold = 0.3
     vad_config.silero_vad.min_silence_duration = 0.3    #  决定分段的时间
-    vad_config.silero_vad.min_speech_duration = 1.5
+    vad_config.silero_vad.min_speech_duration = 1.0
     vad_config.silero_vad.window_size = 512
     vad_config.sample_rate = SAMPLE_RATE
     vad = sherpa_onnx.VoiceActivityDetector(vad_config, buffer_size_in_seconds=300)
