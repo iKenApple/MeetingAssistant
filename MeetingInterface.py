@@ -90,6 +90,12 @@ SPEAKERS = {
         "color": "#ff6347",
         "position": "right"
     },
+    "听众": {
+        "avatar": "https://img0.baidu.com/it/u=2699727399,3838550670&fm=253&fmt=auto&app=138&f=JPEG?w=360&h=360",
+        # 用户图标
+        "color": "#ff6347",
+        "position": "right"
+    },
     "小U": {
         "avatar": "https://img0.baidu.com/it/u=2699727399,3838550670&fm=253&fmt=auto&app=138&f=JPEG?w=360&h=360",
         # 用户图标
@@ -202,7 +208,6 @@ class MeetingAssistant:
         })
         if data.get("query") == 1:
             print("会议总结工作流处理中...")
-            result['output'] = f'小U: {data["output"]}'
             current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             print(f"{current_time} {result['output']}\n")
             # 输出到界面
@@ -216,7 +221,6 @@ class MeetingAssistant:
             AudioPlayer.play(os.path.join(Config.RECORDINGS_DIR, Config.SUMMARY_FILE))
         elif data.get("query") == 2:
             print("会议评价工作流处理中...")
-            result['output'] = f'小U: {data["output"]}'
             current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             print(f"{current_time} {result['output']}\n")
             # 输出到界面
@@ -308,7 +312,7 @@ def init_speaker_system(args):
     # 初始化VAD
     vad_config = sherpa_onnx.VadModelConfig()
     vad_config.silero_vad.model = args.silero_vad_model
-    vad_config.silero_vad.threshold = 0.3
+    #vad_config.silero_vad.threshold = 0.3
     vad_config.silero_vad.min_silence_duration = 0.3    #  决定分段的时间
     vad_config.silero_vad.min_speech_duration = 0.75
     vad_config.silero_vad.window_size = 512
