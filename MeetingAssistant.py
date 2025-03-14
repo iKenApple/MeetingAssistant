@@ -33,6 +33,8 @@ class Config:
     # 路径配置
     RECORDINGS_DIR = "./recordings"
     AI_RESPONSE_FILE = "ai.mp3"
+    SUMMARY_FILE = "summary.mp3"
+    JUDGE_FILE = "judge.mp3"
 
     # Coze配置
     API_TOKEN = 'pat_8zXTiDzY2czhcT19CJmyqd5FzQLeSTVQHNdX7qX6AxwQpAVxtTOzdDE8GdzEiOQe'
@@ -103,19 +105,36 @@ class MeetingAssistant:
             summary_data = summary_future.result()
             self._handle_summary(summary_data, result)
 
-            if summary_data.get("query") != 1:
+            if summary_data.get("query") == 0:
                 # 会议嘉宾处理
                 guest_data = guest_future.result()
                 self._handle_guest_response(guest_data, result)
 
     def _handle_summary(self, data, result):
+        result.update({
+            'output': f'小U: {data["output"]}',
+            'url': data["url"]
+        })
         if data.get("query") == 1:
             print("会议总结工作流处理中...")
             result['output'] = f'小U: {data["output"]}'
             current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             print(f"{current_time} {result['output']}\n")
-            self.pp.say(result['output'])
-            self.pp.runAndWait()
+            response = requests.get(result["url"])
+            with open(os.path.join(Config.RECORDINGS_DIR, Config.SUMMARY_FILE), 'wb') as f:
+                f.write(response.content)
+            AudioPlayer.play(os.path.join(Config.RECORDINGS_DIR, Config.SUMMARY_FILE))
+        elif data.get("query") == 2:
+            print("会议评价工作流处理中...")
+            result['output'] = f'小U: {data["output"]}'
+            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            print(f"{current_time} {result['output']}\n")
+            response = requests.get(result["url"])
+            with open(os.path.join(Config.RECORDINGS_DIR, Config.JUDGE_FILE), 'wb') as f:
+                f.write(response.content)
+            AudioPlayer.play(os.path.join(Config.RECORDINGS_DIR, Config.JUDGE_FILE))
+            #self.pp.say(result['output'])
+            #self.pp.runAndWait()
         #tts = gTTS(text=result['output'], lang='zh-cn')
         #tts.save(os.path.join(Config.RECORDINGS_DIR, Config.SUMMARY_FILE))
         #AudioPlayer.play(os.path.join(Config.RECORDINGS_DIR, Config.SUMMARY_FILE))
@@ -191,8 +210,10 @@ def init_speaker_system(args):
     # 初始化VAD
     vad_config = sherpa_onnx.VadModelConfig()
     vad_config.silero_vad.model = args.silero_vad_model
-    vad_config.silero_vad.min_silence_duration = 0.5
-    vad_config.silero_vad.min_speech_duration = 0.5
+    vad_config.silero_vad.threshold = 0.3
+    vad_config.silero_vad.min_silence_duration = 0.3    #  决定分段的时间
+    vad_config.silero_vad.min_speech_duration = 1.5
+    vad_config.silero_vad.window_size = 512
     vad_config.sample_rate = SAMPLE_RATE
     vad = sherpa_onnx.VoiceActivityDetector(vad_config, buffer_size_in_seconds=300)
 
@@ -293,9 +314,8 @@ def audio_capture_loop(args, assistant):
 
             # 显示实时结果
             if partial_result:
-                sys.stdout.write(Fore.GREEN + Style.BRIGHT + f"\r实时转录: {partial_result}")
+                sys.stdout.write(Fore.GREEN + Style.BRIGHT + f"实时转录: {partial_result}\r")
                 sys.stdout.flush()
-
 
 if __name__ == "__main__":
     try:
