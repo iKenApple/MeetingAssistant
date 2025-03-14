@@ -436,13 +436,15 @@ css = """
 
 with gr.Blocks(css=css, title="多人会议系统") as demo:
     # 标题区
-    gr.Markdown("## 多角色会议系统 ｜ 当前参会人：")
-    with gr.Row():
-        for speaker in SPEAKERS:
-            gr.Image(SPEAKERS[speaker]["avatar"],
-                     label=speaker,
-                     width=30,
-                     show_label=True)
+    gr.Markdown("## 第八期圆桌派：智能应用那些事儿")
+
+    # gr.Markdown("## 多角色会议系统 ｜ 当前参会人：")
+    # with gr.Row():
+    #     for speaker in SPEAKERS:
+    #         gr.Image(SPEAKERS[speaker]["avatar"],
+    #                  label=speaker,
+    #                  width=30,
+    #                  show_label=True)
 
     # 聊天区
     chat_display = gr.HTML()
