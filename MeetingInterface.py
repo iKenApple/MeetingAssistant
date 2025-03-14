@@ -245,7 +245,7 @@ def init_speaker_system(args):
 def load_speaker_profiles(args, extractor):
     """加载预注册的说话人声纹特征"""
     speaker_db = defaultdict(list)
-    with open(args.speaker_file) as f:
+    with open(args.speaker_file, encoding='utf-8') as f:
         for line in f:
             if not line.strip(): continue
             name, path = line.strip().split()
@@ -465,7 +465,13 @@ with gr.Blocks(css=css, title="多人会议系统") as demo:
 if __name__ == "__main__":
     try:
         args = get_merged_args()
-        threading.Thread(target=audio_capture_loop(args, MeetingAssistant()), daemon=True).start()
+        # Fix: Pass the function reference and arguments separately
+        audio_thread = threading.Thread(
+            target=audio_capture_loop,
+            args=(args, MeetingAssistant()),
+            daemon=True
+        )
+        audio_thread.start()
 
         demo.queue().launch(
             server_name="127.0.0.1",
@@ -474,6 +480,7 @@ if __name__ == "__main__":
         )
     except KeyboardInterrupt:
         print("\n程序已终止")
+
 
 
 

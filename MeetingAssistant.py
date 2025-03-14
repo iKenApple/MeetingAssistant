@@ -202,7 +202,7 @@ def init_speaker_system(args):
 def load_speaker_profiles(args, extractor):
     """加载预注册的说话人声纹特征"""
     speaker_db = defaultdict(list)
-    with open(args.speaker_file) as f:
+    with open(args.speaker_file, encoding='utf-8') as f:
         for line in f:
             if not line.strip(): continue
             name, path = line.strip().split()
