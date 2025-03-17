@@ -187,6 +187,10 @@ class MeetingAssistant:
         #guest_data = self.coze.run_workflow('guest', content)
         #self._handle_guest_response(guest_data, result)
         #print("会议嘉宾工作流处理结束")
+        with lock:
+            chat_history.append(
+                Message(speaker="小U", text="小U正在思考中...", timestamp=time.time())
+            )
 
         with ThreadPoolExecutor() as executor:
             summary_future = executor.submit(self.coze.run_workflow, 'summary', content)
@@ -212,6 +216,7 @@ class MeetingAssistant:
             print(f"{current_time} {result['output']}\n")
             # 输出到界面
             with lock:
+                chat_history.pop()
                 chat_history.append(
                     Message(speaker="小U", text=data["output"], timestamp=time.time())
                 )
@@ -225,6 +230,7 @@ class MeetingAssistant:
             print(f"{current_time} {result['output']}\n")
             # 输出到界面
             with lock:
+                chat_history.pop()
                 chat_history.append(
                     Message(speaker="小U", text=data["output"], timestamp=time.time())
                 )
@@ -247,6 +253,7 @@ class MeetingAssistant:
             print(f"{current_time} {result['output']}\n")
             # 输出到界面
             with lock:
+                chat_history.pop()
                 chat_history.append(
                     Message(speaker="小U", text=data["output"], timestamp=time.time())
                 )
@@ -254,6 +261,9 @@ class MeetingAssistant:
             with open(os.path.join(Config.RECORDINGS_DIR, Config.AI_RESPONSE_FILE), 'wb') as f:
                 f.write(response.content)
             AudioPlayer.play(os.path.join(Config.RECORDINGS_DIR, Config.AI_RESPONSE_FILE))
+        else:
+            with lock:
+                chat_history.pop()
 
 def get_merged_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
